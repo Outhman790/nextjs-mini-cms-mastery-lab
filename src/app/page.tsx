@@ -1,103 +1,240 @@
-import Image from "next/image";
+import { db } from '@/lib/db';
+import PageHeader from '@/components/home/PageHeader';
+import PostList from '@/components/home/PostList';
+import type { Post } from '@/types/post';
 
-export default function Home() {
+/**
+ * HOME PAGE - Main Entry Point
+ * =============================
+ *
+ * This is the root page of our application (corresponds to route '/').
+ *
+ * FILE LOCATION MATTERS IN NEXT.JS:
+ * ----------------------------------
+ * - src/app/page.tsx → https://yourdomain.com/
+ * - src/app/about/page.tsx → https://yourdomain.com/about
+ * - src/app/blog/[slug]/page.tsx → https://yourdomain.com/blog/some-post
+ *
+ * This is Next.js's "file-based routing" - the file structure defines the URLs!
+ *
+ * COMPONENT RESPONSIBILITIES:
+ * ---------------------------
+ * This page component has ONE job: Data Orchestration
+ *
+ * What it does:
+ * ✓ Fetch data from the database
+ * ✓ Pass data to presentation components
+ * ✓ Handle the overall page structure
+ *
+ * What it doesn't do:
+ * ✗ Render UI details (delegated to PageHeader, PostList, PostCard)
+ * ✗ Style individual elements (components handle their own styling)
+ * ✗ Complex business logic (keep it simple!)
+ *
+ * This is called "Smart vs Dumb Components" pattern:
+ * - Smart Component (this page): Handles data and logic
+ * - Dumb Components (PageHeader, PostList, PostCard): Just render UI
+ */
+
+/**
+ * SERVER COMPONENT (RSC)
+ * ----------------------
+ * This is a React Server Component because:
+ * - No 'use client' directive at the top
+ * - It's async (can use await)
+ * - Runs only on the server
+ *
+ * Benefits:
+ * 1. Direct Database Access - No API route needed!
+ * 2. Zero Client JavaScript - This component doesn't add to bundle size
+ * 3. Better Performance - Data fetching happens server-side
+ * 4. Security - Database credentials never exposed to client
+ * 5. SEO Friendly - Content is rendered on server (crawlers see it)
+ *
+ * In traditional React, you'd need:
+ * - useEffect for data fetching
+ * - useState for storing data
+ * - Loading states
+ * - Error handling
+ * - API routes
+ *
+ * Server Components eliminate all of that! 🎉
+ */
+export default async function Home() {
+  /**
+   * DATA FETCHING
+   * -------------
+   * We query the database directly using Prisma ORM.
+   *
+   * PRISMA QUERY BREAKDOWN:
+   *
+   * db.post.findMany({...})
+   * ├─ db: Our Prisma client instance (from @/lib/db)
+   * ├─ post: The model name from our schema (prisma/schema.prisma)
+   * └─ findMany: Method to fetch multiple records
+   *
+   * Query Configuration:
+   *
+   * 1. where: { published: true }
+   *    - Filters results to only published posts
+   *    - Drafts (published: false) are excluded
+   *    - This is called a "WHERE clause" in SQL
+   *
+   * 2. include: { category: true }
+   *    - Fetches related category data
+   *    - Called "eager loading" or "joining"
+   *    - Without this, category would be null/undefined
+   *    - One query instead of N+1 queries (efficient!)
+   *
+   * 3. orderBy: { createdAt: 'desc' }
+   *    - Sorts results by creation date
+   *    - 'desc' = descending (newest first)
+   *    - 'asc' would be ascending (oldest first)
+   *
+   * 4. take: 10
+   *    - Limits results to 10 posts
+   *    - Like SQL's LIMIT clause
+   *    - Later we'll add pagination for the rest
+   *
+   * TYPE ANNOTATION: Post[]
+   * -----------------------
+   * We tell TypeScript this is an array of Post objects.
+   * - Provides autocomplete
+   * - Catches type errors
+   * - Makes code self-documenting
+   */
+  const posts: Post[] = await db.post.findMany({
+    where: {
+      published: true,
+    },
+    include: {
+      category: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+  });
+
+  /**
+   * JSX RETURN - Component Composition
+   * -----------------------------------
+   *
+   * We're composing our UI from smaller components:
+   * - PageHeader: Displays title and subtitle
+   * - PostList: Handles the grid layout and renders posts
+   *
+   */
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    /**
+     * PAGE CONTAINER
+     * --------------
+     * Tailwind classes:
+     * - min-h-screen: Minimum height of viewport (100vh)
+     * - bg-gray-50: Light gray background in light mode
+     * - dark:bg-gray-900: Dark background in dark mode
+     *
+     * This ensures the page always fills the viewport.
+     */
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/*
+        CONTENT CONTAINER
+        -----------------
+        Max-width container that centers content.
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        - max-w-7xl: Maximum width of 80rem (1280px)
+        - mx-auto: Centers horizontally (margin: 0 auto)
+        - px-4 sm:px-6 lg:px-8: Responsive horizontal padding
+          * 1rem on mobile
+          * 1.5rem on small screens (640px+)
+          * 2rem on large screens (1024px+)
+        - py-12: Vertical padding of 3rem (48px)
+
+        This creates a responsive, centered layout with proper spacing!
+      */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/*
+          COMPONENT COMPOSITION
+          ---------------------
+          We render our two main components:
+
+          1. PageHeader
+             - No props needed (displays static content)
+             - Could be made dynamic in the future
+
+          2. PostList
+             - Receives 'posts' array as prop
+             - Handles rendering all posts
+             - Also handles empty state
+        */}
+        <PageHeader />
+        <PostList posts={posts} />
+      </div>
     </div>
   );
 }
+
+/**
+ * ARCHITECTURE COMPARISON
+ * =======================
+ *
+ * BEFORE (Monolithic):
+ * --------------------
+ * page.tsx (267 lines)
+ * ├─ Types
+ * ├─ Data fetching
+ * ├─ Header rendering
+ * ├─ Post list rendering
+ * └─ Post card rendering
+ *
+ * AFTER (Modular):
+ * ----------------
+ * page.tsx (100 lines) → Data orchestration
+ * ├─ types/post.ts → Type definitions
+ * ├─ components/home/PageHeader.tsx → Header UI
+ * ├─ components/home/PostList.tsx → List layout
+ * └─ components/home/PostCard.tsx → Card UI
+ *
+ * Benefits:
+ * ✓ Each file has single responsibility
+ * ✓ Components are reusable
+ * ✓ Easier to test
+ * ✓ Easier to maintain
+ * ✓ Easier to understand
+ * ✓ Multiple developers can work simultaneously
+ * ✓ Changes are localized
+ *
+ * KEY NEXT.JS 15 CONCEPTS:
+ * ========================
+ *
+ * 1. FILE-BASED ROUTING
+ *    - page.tsx in a folder creates a route
+ *    - No need for react-router or similar
+ *
+ * 2. SERVER COMPONENTS (RSC)
+ *    - Async components
+ *    - Direct database access
+ *    - Zero client JavaScript
+ *
+ * 3. DATA FETCHING
+ *    - No useEffect needed
+ *    - No loading states needed (for now)
+ *    - Happens during server render
+ *
+ * 4. COMPONENT COMPOSITION
+ *    - Build complex UIs from simple components
+ *    - Props flow down the tree
+ *    - Each component has clear responsibility
+ *
+ * 5. TYPESCRIPT INTEGRATION
+ *    - Type-safe props
+ *    - Type-safe database queries
+ *    - Catch errors at compile time
+ *
+ * NEXT STEPS (Hour 2 & 3):
+ * ========================
+ * - Add ISR (Incremental Static Regeneration)
+ * - Implement pagination
+ * - Add loading states
+ * - Create dynamic routes for individual posts
+ */
