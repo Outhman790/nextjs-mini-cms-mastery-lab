@@ -175,6 +175,166 @@ export default async function Home() {
 }
 
 /**
+ * ============================================================================
+ * ISR (INCREMENTAL STATIC REGENERATION) CONFIGURATION
+ * ============================================================================
+ *
+ * WHAT IS ISR?
+ * ------------
+ * ISR is a Next.js feature that allows you to create or update static pages
+ * AFTER you've built your site, without rebuilding the entire site.
+ *
+ * Think of it like this:
+ * - Your page is generated once (like SSG - Static Site Generation)
+ * - BUT it can update itself automatically on a schedule
+ * - Users get fast, cached pages
+ * - Content stays fresh without constant rebuilds
+ *
+ * HOW IT WORKS:
+ * -------------
+ * 1. User requests the page → Gets cached version (super fast!)
+ * 2. If cache is older than 'revalidate' time:
+ *    - User still gets the cached version (no waiting!)
+ *    - Next.js regenerates page in background
+ *    - Next request gets the fresh version
+ *
+ * This is called "stale-while-revalidate" pattern.
+ *
+ * RENDERING STRATEGIES COMPARISON:
+ * ---------------------------------
+ *
+ * 1. SSR (Server-Side Rendering) - Default in Next.js 15
+ *    - Renders on EVERY request
+ *    - Always fresh data
+ *    - Slower (database query each time)
+ *    - Use for: Real-time data, user-specific content
+ *
+ * 2. SSG (Static Site Generation)
+ *    - Renders at BUILD time only
+ *    - Super fast (just HTML files)
+ *    - Never updates (unless you rebuild)
+ *    - Use for: Blog posts, marketing pages, docs
+ *
+ * 3. ISR (Incremental Static Regeneration) - What we're using!
+ *    - Renders at build time + revalidates periodically
+ *    - Fast (cached) + Fresh (updates automatically)
+ *    - Best of both worlds!
+ *    - Use for: Blog feeds, product listings, news sites
+ *
+ * 4. CSR (Client-Side Rendering)
+ *    - Renders in browser
+ *    - Fetch data with useEffect
+ *    - Use for: Dashboards, user-specific data
+ *
+ * NEXT.JS 15 CACHING CHANGES:
+ * ----------------------------
+ * Important! Next.js 15 changed default behavior:
+ *
+ * Next.js 14 (old):
+ * - fetch() was cached by default
+ * - Had to opt-out with { cache: 'no-store' }
+ *
+ * Next.js 15 (new):
+ * - fetch() is NOT cached by default
+ * - Must opt-in with { cache: 'force-cache' }
+ * - OR use route segment config (like we do below)
+ *
+ * This change makes Next.js more predictable and easier to reason about!
+ */
+
+/**
+ * REVALIDATE CONFIGURATION
+ * -------------------------
+ * By exporting 'revalidate', we tell Next.js:
+ * "Cache this page, but refresh it every 60 seconds"
+ *
+ * The number is in SECONDS:
+ * - revalidate = 60 → Updates every 1 minute
+ * - revalidate = 3600 → Updates every 1 hour
+ * - revalidate = 86400 → Updates every 24 hours
+ * - revalidate = 0 → Never cache (equivalent to SSR)
+ * - No revalidate export → SSR (dynamic rendering)
+ *
+ * HOW TO CHOOSE THE RIGHT VALUE:
+ * -------------------------------
+ * Consider:
+ * 1. How often does your data change?
+ * 2. How important is freshness vs speed?
+ * 3. Your server/database load capacity
+ *
+ * Examples:
+ * - Blog homepage: 60-300 seconds (1-5 minutes)
+ * - Product catalog: 300-600 seconds (5-10 minutes)
+ * - News site: 30-60 seconds
+ * - Documentation: 3600+ seconds (1+ hour)
+ * - User dashboard: 0 or no revalidate (always dynamic)
+ *
+ * For our blog CMS, 60 seconds is a good balance:
+ * - New posts appear within 1 minute
+ * - Database only queried once per minute (max)
+ * - Users get instant page loads from cache
+ */
+export const revalidate = 60;
+
+/**
+ * OTHER ROUTE SEGMENT CONFIG OPTIONS:
+ * ------------------------------------
+ * You can also export these configs in page.tsx:
+ *
+ * export const dynamic = 'auto' | 'force-dynamic' | 'error' | 'force-static'
+ * - Controls when the route is rendered
+ * - 'force-dynamic' = always SSR (never cache)
+ * - 'force-static' = always SSG (build time only)
+ *
+ * export const dynamicParams = true | false
+ * - For dynamic routes like [slug]
+ * - Controls if unknown paths should be generated
+ *
+ * export const fetchCache = 'auto' | 'default-cache' | 'only-cache' | 'force-cache' | 'force-no-store'
+ * - Controls fetch() caching behavior
+ *
+ * export const runtime = 'nodejs' | 'edge'
+ * - Controls where code runs
+ * - 'edge' = Runs on Edge Runtime (faster, more locations, some limitations)
+ * - 'nodejs' = Full Node.js runtime (default)
+ *
+ * For now, we only need 'revalidate' for ISR!
+ */
+
+/**
+ * HOW TO VERIFY ISR IS WORKING:
+ * ------------------------------
+ *
+ * 1. Build the application:
+ *    npm run build
+ *
+ * 2. Start production server:
+ *    npm start
+ *
+ * 3. Visit http://localhost:3000
+ *    - First load: Page is generated
+ *    - Next loads: Served from cache (instant!)
+ *
+ * 4. Change data in database:
+ *    - Add/edit a post in Prisma Studio
+ *    - Refresh page immediately → Still see old data (cached!)
+ *    - Wait 61+ seconds and refresh → See new data!
+ *
+ * 5. Check build output:
+ *    Look for:
+ *    ○ / (ISR: 60 Seconds)
+ *    This means ISR is working!
+ *
+ * DEBUGGING ISR:
+ * --------------
+ * If ISR isn't working:
+ * 1. Make sure you're using production mode (npm start, not npm run dev)
+ * 2. Development mode (npm run dev) always regenerates
+ * 3. Check the build output for cache indicators
+ * 4. Verify fetch requests don't have cache: 'no-store'
+ */
+
+/**
  * ARCHITECTURE COMPARISON
  * =======================
  *
