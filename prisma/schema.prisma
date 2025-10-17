@@ -1,25 +1,117 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+/**
+ * GENERATOR CONFIGURATION
+ * =======================
+ * Specifies how Prisma Client should be generated.
+ *
+ * provider: "prisma-client-js" = Generate TypeScript/JavaScript client
+ * output: Where to place generated Prisma Client files
+ */
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
+/**
+ * DATASOURCE CONFIGURATION
+ * ========================
+ * Specifies which database to connect to.
+ *
+ * CHANGED FROM SQLITE TO POSTGRESQL:
+ * ----------------------------------
+ * Old: provider = "sqlite"
+ * New: provider = "postgresql"
+ *
+ * WHY POSTGRESQL?
+ * ---------------
+ * - SQLite is file-based (doesn't work on Vercel/serverless)
+ * - PostgreSQL is server-based (works everywhere)
+ * - Better for production deployments
+ * - More features (full-text search, JSON, advanced queries)
+ * - Industry standard for web applications
+ *
+ * CONNECTION STRING:
+ * ------------------
+ * PostgreSQL format:
+ * postgresql://username:password@host:port/database
+ *
+ * Example:
+ * postgresql://postgres:mypassword@localhost:5432/mini_cms_dev
+ *
+ * This comes from the .env file (DATABASE_URL variable)
+ */
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+/**
+ * CATEGORY MODEL
+ * ==============
+ * Represents blog post categories.
+ *
+ * DATETIME FIELDS IN POSTGRESQL:
+ * -------------------------------
+ * Added @db.Timestamp(6) to DateTime fields.
+ *
+ * Why @db.Timestamp(6)?
+ * - SQLite stores DateTime as TEXT (simple)
+ * - PostgreSQL has multiple date/time types:
+ *   - DATE (just date)
+ *   - TIME (just time)
+ *   - TIMESTAMP (date + time, no timezone)
+ *   - TIMESTAMPTZ (date + time + timezone)
+ *
+ * @db.Timestamp(6) means:
+ * - Use TIMESTAMP type
+ * - (6) = 6 digits of microsecond precision
+ * - Example: 2024-01-15 10:30:45.123456
+ *
+ * Without this annotation:
+ * - Prisma uses default TIMESTAMP(3) = 3 digits
+ * - But (6) is more precise and matches PostgreSQL defaults
+ */
 model Category {
   id        String   @id @default(cuid())
   name      String   @unique
   slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
   posts     Post[]
 }
 
+/**
+ * POST MODEL
+ * ==========
+ * Represents blog posts.
+ *
+ * POSTGRESQL-SPECIFIC CHANGES:
+ * -----------------------------
+ * 1. Added @db.Timestamp(6) to createdAt and updatedAt
+ *    - Ensures proper timestamp precision in PostgreSQL
+ *
+ * INDEXES:
+ * --------
+ * @@index attributes tell PostgreSQL to create indexes.
+ * Indexes make queries faster (like a book's index).
+ *
+ * [published, createdAt]:
+ * - Composite index for "published posts sorted by date"
+ * - Makes homepage queries fast
+ *
+ * [slug]:
+ * - Index for looking up posts by slug
+ * - Makes /posts/[slug] pages fast
+ *
+ * [categoryId]:
+ * - Index for finding posts by category
+ * - Makes category pages fast
+ *
+ * Without indexes, PostgreSQL scans every row (slow!).
+ * With indexes, PostgreSQL jumps directly to matches (fast!).
+ */
 model Post {
   id         String   @id @default(cuid())
   title      String
@@ -31,8 +123,8 @@ model Post {
   likes      Int      @default(0)
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @db.Timestamp(6)
 
   @@index([published, createdAt])
   @@index([slug])
