@@ -1,15 +1,64 @@
 @import "tailwindcss";
 
+/**
+ * CUSTOM KEYFRAME ANIMATIONS
+ * ===========================
+ *
+ * Tailwind v4 uses CSS-based configuration instead of JavaScript config files.
+ * Custom animations are defined here using standard CSS @keyframes.
+ */
+
+/**
+ * fadeIn Animation
+ * ----------------
+ * Smooth fade-in effect with slight upward movement.
+ *
+ * Usage: className="animate-fadeIn"
+ *
+ * Performance:
+ * - GPU-accelerated (opacity + transform)
+ * - Smooth 60fps animation
+ * - No JavaScript required
+ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/**
+ * TAILWIND V4 THEME CONFIGURATION
+ * ================================
+ *
+ * In Tailwind v4, custom utilities are registered using @theme inline.
+ * This replaces the old tailwind.config.js extend pattern.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /**
+   * Custom Animation Registration
+   * ------------------------------
+   * Register the fadeIn keyframes as a Tailwind animation utility.
+   *
+   * This creates: animate-fadeIn
+   * Duration: 500ms
+   * Easing: ease-in-out (natural acceleration/deceleration)
+   */
+  --animate-fadeIn: fadeIn 0.5s ease-in-out;
 }
 
 @media (prefers-color-scheme: dark) {
