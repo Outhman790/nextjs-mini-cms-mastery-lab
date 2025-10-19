@@ -60,11 +60,142 @@ import type { Post } from '@/types/post';
  *
  * Server Components eliminate all of that! 🎉
  */
-export default async function Home() {
+
+/**
+ * PAGE COMPONENT PROPS
+ * ====================
+ *
+ * Next.js automatically passes these props to page components:
+ *
+ * 1. params - Dynamic route segments (e.g., /blog/[slug] → params.slug)
+ * 2. searchParams - URL query parameters (e.g., ?page=2 → searchParams.page)
+ *
+ * IMPORTANT: searchParams makes this route DYNAMIC (not static)!
+ *
+ * Type Definition:
+ * ----------------
+ */
+type HomeProps = {
+  searchParams: Promise<{
+    page?: string;  // Optional because URL might not have ?page=
+  }>;
+};
+
+/**
+ * HOME PAGE COMPONENT
+ * -------------------
+ * Now accepts searchParams to enable URL-based pagination.
+ *
+ * Example URLs:
+ * - / → page 1 (default)
+ * - /?page=1 → page 1 (explicit)
+ * - /?page=2 → page 2
+ * - /?page=3 → page 3
+ */
+export default async function Home({ searchParams }: HomeProps) {
   /**
-   * DATA FETCHING
-   * -------------
-   * We query the database directly using Prisma ORM.
+   * SEARCHPARAMS HANDLING
+   * ----------------------
+   * In Next.js 15, searchParams is a Promise that we need to await.
+   * This is for better streaming and Partial Prerendering support.
+   */
+  const resolvedSearchParams = await searchParams;
+
+  /**
+   * PAGINATION CONFIGURATION
+   * ========================
+   *
+   * POSTS_PER_PAGE: How many posts to show per page
+   * - Too few: Users have to click too much
+   * - Too many: Page loads slowly, overwhelming
+   * - 6 is a good balance for blog posts
+   */
+  const POSTS_PER_PAGE = 6;
+
+  /**
+   * CURRENT PAGE CALCULATION
+   * ========================
+   *
+   * Step 1: Get 'page' from URL query parameter
+   * - resolvedSearchParams.page might be undefined (no ?page= in URL)
+   * - Default to '1' if not provided
+   *
+   * Step 2: Convert string to number
+   * - URL parameters are always strings ('2' not 2)
+   * - parseInt() converts string to integer
+   *
+   * Step 3: Validate and ensure minimum page 1
+   * - Math.max(1, page) ensures we never go below page 1
+   * - If someone visits /?page=0 or /?page=-5, we show page 1
+   */
+  const currentPage = Math.max(
+    1,
+    parseInt(resolvedSearchParams.page || '1', 10)
+  );
+
+  /**
+   * OFFSET CALCULATION (Database Skip)
+   * ===================================
+   *
+   * Offset determines how many records to skip in the database.
+   *
+   * Formula: (currentPage - 1) × POSTS_PER_PAGE
+   *
+   * Examples:
+   * - Page 1: (1 - 1) × 6 = 0  → Skip 0, show posts 1-6
+   * - Page 2: (2 - 1) × 6 = 6  → Skip 6, show posts 7-12
+   * - Page 3: (3 - 1) × 6 = 12 → Skip 12, show posts 13-18
+   *
+   * This is how SQL OFFSET works:
+   * SELECT * FROM posts LIMIT 6 OFFSET 12
+   * (Skip first 12 records, then take 6)
+   */
+  const offset = (currentPage - 1) * POSTS_PER_PAGE;
+  /**
+   * DATA FETCHING - TOTAL COUNT
+   * ============================
+   *
+   * First, we need to know HOW MANY total posts exist.
+   * This is required to calculate:
+   * - Total number of pages
+   * - Whether to show "Next" button
+   * - Display "Showing X-Y of Z posts"
+   *
+   * db.post.count():
+   * - Counts records matching the where clause
+   * - Much faster than fetching all records
+   * - Returns a number (not an array)
+   */
+  const totalPosts = await db.post.count({
+    where: {
+      published: true,  // Only count published posts
+    },
+  });
+
+  /**
+   * TOTAL PAGES CALCULATION
+   * ========================
+   *
+   * Math.ceil() rounds UP to nearest integer.
+   *
+   * Examples:
+   * - 5 posts, 6 per page: Math.ceil(5/6) = 1 page
+   * - 6 posts, 6 per page: Math.ceil(6/6) = 1 page
+   * - 7 posts, 6 per page: Math.ceil(7/6) = 2 pages (need 2nd page for 1 post)
+   * - 12 posts, 6 per page: Math.ceil(12/6) = 2 pages
+   * - 13 posts, 6 per page: Math.ceil(13/6) = 3 pages
+   *
+   * Why ceil and not floor/round?
+   * - We need a full page even for 1 extra post
+   * - floor(7/6) = 1 would hide the 7th post!
+   */
+  const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE);
+
+  /**
+   * DATA FETCHING - PAGINATED POSTS
+   * ================================
+   *
+   * Now we fetch only the posts for the current page.
    *
    * PRISMA QUERY BREAKDOWN:
    *
@@ -88,13 +219,27 @@ export default async function Home() {
    *
    * 3. orderBy: { createdAt: 'desc' }
    *    - Sorts results by creation date
-   *    - 'desc' = descending (newest first)
+   *    - 'desc' = descending (NEWEST FIRST) ← This is our sorting!
    *    - 'asc' would be ascending (oldest first)
+   *    - Posts are automatically sorted latest first
    *
-   * 4. take: 10
-   *    - Limits results to 10 posts
-   *    - Like SQL's LIMIT clause
-   *    - Later we'll add pagination for the rest
+   * 4. skip: offset
+   *    - How many records to skip before returning results
+   *    - Page 1: skip 0
+   *    - Page 2: skip 6
+   *    - Page 3: skip 12
+   *    - This is SQL's OFFSET clause
+   *
+   * 5. take: POSTS_PER_PAGE
+   *    - Maximum number of records to return
+   *    - Always 6 in our case
+   *    - This is SQL's LIMIT clause
+   *
+   * SQL Equivalent:
+   * SELECT * FROM Post
+   * WHERE published = true
+   * ORDER BY createdAt DESC
+   * LIMIT 6 OFFSET 0;
    *
    * TYPE ANNOTATION: Post[]
    * -----------------------
@@ -111,9 +256,10 @@ export default async function Home() {
       category: true,
     },
     orderBy: {
-      createdAt: 'desc',
+      createdAt: 'desc',  // SORTING: Latest first!
     },
-    take: 10,
+    skip: offset,         // PAGINATION: Skip previous pages
+    take: POSTS_PER_PAGE, // PAGINATION: Take 6 posts
   });
 
   /**
@@ -168,7 +314,12 @@ export default async function Home() {
              - Also handles empty state
         */}
         <PageHeader />
-        <PostList posts={posts} />
+        <PostList
+          posts={posts}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalPosts={totalPosts}
+        />
       </div>
     </div>
   );
