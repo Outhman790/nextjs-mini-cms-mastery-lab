@@ -84,9 +84,16 @@ export type PostCardProps = {
  * PostListProps Type
  * ------------------
  * Defines what props the PostList component accepts.
+ *
+ * UPDATED FOR PAGINATION:
+ * - Added currentPage, totalPages, totalPosts
+ * - These enable displaying pagination controls and post counts
  */
 export type PostListProps = {
-  posts: Post[];  // Array of Post objects (Post[] means "array of Post")
+  posts: Post[];        // Array of Post objects for current page
+  currentPage: number;  // Current page number (e.g., 2)
+  totalPages: number;   // Total number of pages (e.g., 5)
+  totalPosts: number;   // Total number of posts across all pages (e.g., 25)
 };
 
 /**
